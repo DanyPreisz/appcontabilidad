@@ -36,6 +36,97 @@
     <button type="submit">Añadir Producto</button>
   </form>
 
+<h2>💰 Registrar Venta</h2>
+<form id="formVenta">
+  <input type="text" id="clienteVenta" placeholder="Cliente (opcional, ej. Mostrador)">
+  <div id="itemsVenta"></div>
+  <button type="button" onclick="agregarItemVenta()">+ Agregar producto</button>
+  <button type="submit">Confirmar Venta</button>
+</form>
+
+<h2>📊 Últimas Ventas</h2>
+<div id="listaVentas"></div>
+
+<script>
+// --- Funciones de venta ---
+let itemsVenta = [];
+
+function agregarItemVenta() {
+  fetch(API_URL.replace('/productos', '')) // Quita /productos para listar
+    .then(res => res.json())
+    .then(productos => {
+      let html = '<select required>';
+      productos.forEach(p => {
+        if (p.stock > 0) {
+          html += `<option value="${p._id}">${p.codigo} - ${p.nombre} (Stock: ${p.stock} - $${p.precioVenta})</option>`;
+        }
+      });
+      html += '</select>';
+      html += '<input type="number" min="1" placeholder="Cantidad" required style="width:100px;">';
+      html += '<button type="button" onclick="this.parentNode.remove()">Eliminar</button><br>';
+
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      document.getElementById('itemsVenta').appendChild(div);
+    });
+}
+
+document.getElementById('formVenta').addEventListener('submit', async e => {
+  e.preventDefault();
+  itemsVenta = [];
+  const items = document.querySelectorAll('#itemsVenta > div');
+  for (const item of items) {
+    const select = item.querySelector('select');
+    const cantInput = item.querySelector('input[type=number]');
+    if (select && cantInput) {
+      itemsVenta.push({
+        productoId: select.value,
+        cantidad: parseInt(cantInput.value)
+      });
+    }
+  }
+
+  if (itemsVenta.length === 0) return alert('Agregá al menos un producto');
+
+  await fetch(API_URL.replace('/productos', '/ventas'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productos: itemsVenta,
+      cliente: document.getElementById('clienteVenta').value || 'Mostrador'
+    })
+  });
+
+  alert('Venta registrada - Stock actualizado');
+  document.getElementById('formVenta').reset();
+  document.getElementById('itemsVenta').innerHTML = '';
+  cargarProductos();
+  cargarVentas();
+});
+
+async function cargarVentas() {
+  const res = await fetch(API_URL.replace('/productos', '/ventas'));
+  const ventas = await res.json();
+  const cont = document.getElementById('listaVentas');
+  cont.innerHTML = ventas.length === 0 ? '<p>No hay ventas registradas.</p>' : '';
+  ventas.forEach(v => {
+    const div = document.createElement('div');
+    div.style = 'background:white; padding:15px; margin:10px 0; border-radius:8px;';
+    div.innerHTML = `
+      <strong>Fecha:</strong> ${new Date(v.fecha).toLocaleString('es-AR')}<br>
+      <strong>Cliente:</strong> ${v.cliente}<br>
+      <strong>Total con IVA:</strong> $${v.total.toFixed(2)} (IVA: $${v.iva.toFixed(2)})<br>
+      <ul>${v.productos.map(p => `<li>${p.cantidad}x ${p.nombre} ($${p.precioUnitario}) = $${p.subtotal}</li>`).join('')}</ul>
+    `;
+    cont.appendChild(div);
+  });
+}
+
+cargarVentas(); // Carga al iniciar
+</script>
+
+
+  
   <div class="buscador">
     <input type="text" id="busqueda" placeholder="Buscar por código, nombre o categoría...">
     <button onclick="buscar()">Buscar</button>

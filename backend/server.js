@@ -62,6 +62,81 @@ app.post('/api/productos', async (req, res) => {
   }
 });
 
+// Modelo de Venta
+const ventaSchema = new mongoose.Schema({
+  fecha: { type: Date, default: Date.now },
+  productos: [{
+    productoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto' },
+    codigo: String,
+    nombre: String,
+    cantidad: Number,
+    precioUnitario: Number,
+    subtotal: Number
+  }],
+  total: Number,
+  iva: Number, // 21% por defecto
+  cliente: String, // Opcional
+});
+
+const Venta = mongoose.model('Venta', ventaSchema);
+
+// Registrar venta (actualiza stock)
+app.post('/api/ventas', async (req, res) => {
+  try {
+    const { productos, cliente } = req.body; // productos = array de {productoId, cantidad}
+    let total = 0;
+    const productosVendidos = [];
+
+    for (const item of productos) {
+      const producto = await Producto.findById(item.productoId);
+      if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
+      if (producto.stock < item.cantidad) return res.status(400).json({ error: `Stock insuficiente para ${producto.nombre}` });
+
+      const subtotal = producto.precioVenta * item.cantidad;
+      total += subtotal;
+
+      // Actualizar stock
+      producto.stock -= item.cantidad;
+      await producto.save();
+
+      productosVendidos.push({
+        productoId: producto._id,
+        codigo: producto.codigo,
+        nombre: producto.nombre,
+        cantidad: item.cantidad,
+        precioUnitario: producto.precioVenta,
+        subtotal
+      });
+    }
+
+    const iva = total * 0.21; // IVA 21%
+    const totalConIva = total + iva;
+
+    const nuevaVenta = new Venta({
+      productos: productosVendidos,
+      total: totalConIva,
+      iva,
+      cliente: cliente || 'Mostrador'
+    });
+
+    await nuevaVenta.save();
+    res.json(nuevaVenta);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Listar ventas
+app.get('/api/ventas', async (req, res) => {
+  const ventas = await Venta.find().sort({ fecha: -1 }).limit(100);
+  res.json(ventas);
+});
+
+
+
+
+
+      
 // Listar todos
 app.get('/api/productos', async (req, res) => {
   const productos = await Producto.find().sort({ fecha: -1 });

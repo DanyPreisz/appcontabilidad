@@ -50,27 +50,34 @@
 <script>
 // --- Funciones de venta ---
 let itemsVenta = [];
-
 function agregarItemVenta() {
-  fetch(API_URL.replace('/productos', '')) // Quita /productos para listar
-    .then(res => res.json())
+  // Llama correctamente a la ruta de productos
+  fetch('https://appcontabilidad-ljjw.onrender.com/api/productos')  // API_URL ya termina en /api/productos
+    .then(res => {
+      if (!res.ok) throw new Error('Error al cargar productos');
+      return res.json();
+    })
     .then(productos => {
       let html = '<select required>';
+      html += '<option value="">Selecciona un producto</option>'; // Opción por defecto
       productos.forEach(p => {
         if (p.stock > 0) {
           html += `<option value="${p._id}">${p.codigo} - ${p.nombre} (Stock: ${p.stock} - $${p.precioVenta})</option>`;
         }
       });
       html += '</select>';
-      html += '<input type="number" min="1" placeholder="Cantidad" required style="width:100px;">';
-      html += '<button type="button" onclick="this.parentNode.remove()">Eliminar</button><br>';
+      html += '<input type="number" min="1" max="999" placeholder="Cantidad" required style="width:120px; margin-left:10px;">';
+      html += '<button type="button" onclick="this.parentNode.remove()" style="margin-left:10px; background:#e74c3c;">Eliminar</button><br><br>';
 
       const div = document.createElement('div');
       div.innerHTML = html;
       document.getElementById('itemsVenta').appendChild(div);
+    })
+    .catch(err => {
+      alert('Error al cargar productos: ' + err.message);
+      console.error(err);
     });
 }
-
 document.getElementById('formVenta').addEventListener('submit', async e => {
   e.preventDefault();
   itemsVenta = [];

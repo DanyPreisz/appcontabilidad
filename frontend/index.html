@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario de Negocio</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px; background: #f0f2f5; }
+    h1 { text-align: center; color: #2c3e50; }
+    form { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 30px; }
+    input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+    button { background: #3498db; color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
+    button:hover { background: #2980b9; }
+    .producto { background: white; padding: 20px; margin: 20px 0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; gap: 20px; align-items: center; }
+    .producto img { width: 150px; height: 150px; object-fit: cover; border-radius: 10px; }
+    .info { flex: 1; }
+    .stock { font-weight: bold; color: #e67e22; }
+    .bajo { color: #c0392b; }
+    .acciones { display: flex; gap: 10px; margin-top: 10px; }
+    .eliminar { background: #e74c3c; }
+    .eliminar:hover { background: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>📦 Inventario de Negocio</h1>
+
+  <form id="formProducto">
+    <input type="text" id="codigo" placeholder="Código / SKU (único)" required>
+    <input type="text" id="nombre" placeholder="Nombre del producto" required>
+    <input type="text" id="categoria" placeholder="Categoría">
+    <input type="number" id="stock" placeholder="Stock inicial" min="0" required>
+    <input type="number" id="precioCosto" placeholder="Precio de costo" step="0.01">
+    <input type="number" id="precioVenta" placeholder="Precio de venta" step="0.01" required>
+    <input type="text" id="proveedor" placeholder="Proveedor">
+    <input type="file" id="foto" accept="image/*">
+    <button type="submit">Añadir Producto</button>
+  </form>
+
+  <div class="buscador">
+    <input type="text" id="busqueda" placeholder="Buscar por código, nombre o categoría...">
+    <button onclick="buscar()">Buscar</button>
+    <button onclick="cargarProductos()">Todos</button>
+  </div>
+
+  <div id="listaProductos"></div>
+
+  <script>
+    const API_URL = 'https://tu-inventario.onrender.com/api/productos';
+
+    async function cargarProductos() {
+      const res = await fetch(API_URL);
+      const productos = await res.json();
+      mostrarProductos(productos);
+    }
+
+    async function buscar() {
+      const q = document.getElementById('busqueda').value.trim();
+      const url = q ? `${API_URL}/buscar?q=${encodeURIComponent(q)}` : API_URL;
+      const res = await fetch(url);
+      const productos = await res.json();
+      mostrarProductos(productos);
+    }
+
+    function mostrarProductos(productos) {
+      const cont = document.getElementById('listaProductos');
+      cont.innerHTML = productos.length === 0 ? '<p>No hay productos.</p>' : '';
+      productos.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'producto';
+        div.innerHTML = `
+          ${p.fotoUrl ? `<img src="${p.fotoUrl}" alt="${p.nombre}">` : ''}
+          <div class="info">
+            <h2>${p.nombre} <small>(Código: ${p.codigo})</small></h2>
+            <p><strong>Categoría:</strong> ${p.categoria || 'Sin categoría'}</p>
+            <p class="stock ${p.stock < 10 ? 'bajo' : ''}"><strong>Stock:</strong> ${p.stock} unidades</p>
+            <p><strong>Precio costo:</strong> $${p.precioCosto || 'N/D'} | <strong>Precio venta:</strong> $${p.precioVenta}</p>
+            <p><strong>Proveedor:</strong> ${p.proveedor || 'No especificado'}</p>
+            <div class="acciones">
+              <button onclick="ajustarStock('${p._id}', prompt('Cantidad a sumar/restar (+ o -):'))">Ajustar Stock</button>
+              <button class="eliminar" onclick="eliminar('${p._id}')">Eliminar</button>
+            </div>
+          </div>
+        `;
+        cont.appendChild(div);
+      });
+    }
+
+    document.getElementById('formProducto').addEventListener('submit', async e => {
+      e.preventDefault();
+      const file = document.getElementById('foto').files[0];
+      let base64 = '';
+      if (file) {
+        base64 = await new Promise(res => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codigo: document.getElementById('codigo').value.trim(),
+          nombre: document.getElementById('nombre').value,
+          categoria: document.getElementById('categoria').value,
+          stock: parseInt(document.getElementById('stock').value),
+          precioCosto: parseFloat(document.getElementById('precioCosto').value) || null,
+          precioVenta: parseFloat(document.getElementById('precioVenta').value),
+          proveedor: document.getElementById('proveedor').value,
+          base64Foto: base64
+        })
+      });
+
+      cargarProductos();
+      e.target.reset();
+    });
+
+    async function ajustarStock(id, cantidadStr) {
+      const cantidad = parseInt(cantidadStr);
+      if (isNaN(cantidad) || cantidad === 0) return alert('Cantidad inválida');
+      await fetch(`${API_URL}/${id}/stock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidad })
+      });
+      cargarProductos();
+    }
+
+    async function eliminar(id) {
+      if (confirm('¿Eliminar este producto permanentemente?')) {
+        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        cargarProductos();
+      }
+    }
+
+    cargarProductos();
+  </script>
+</body>
+</html>

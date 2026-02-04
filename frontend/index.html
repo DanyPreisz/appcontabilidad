@@ -2,237 +2,136 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventario de Negocio</title>
+  <title>App Contabilidad</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px; background: #f0f2f5; }
-    h1 { text-align: center; color: #2c3e50; }
-    form { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 30px; }
-    input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-    button { background: #3498db; color: white; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
-    button:hover { background: #2980b9; }
-    .producto { background: white; padding: 20px; margin: 20px 0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; gap: 20px; align-items: center; }
-    .producto img { width: 150px; height: 150px; object-fit: cover; border-radius: 10px; }
-    .info { flex: 1; }
-    .stock { font-weight: bold; color: #e67e22; }
-    .bajo { color: #c0392b; }
-    .acciones { display: flex; gap: 10px; margin-top: 10px; }
-    .eliminar { background: #e74c3c; }
-    .eliminar:hover { background: #c0392b; }
+    body { font-family: Arial; }
+    .tab { display: none; }
+    .active { display: block; }
+    button { margin: 5px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
   </style>
 </head>
 <body>
-  <h1>📦 Inventario de Negocio</h1>
+  <h1>App Contabilidad</h1>
+  <button onclick="showTab('compras')">Compras</button>
+  <button onclick="showTab('ventas')">Ventas</button>
+  <button onclick="showTab('pagos')">Pagos</button>
+  <button onclick="showTab('cobros')">Cobros</button>
 
-  <form id="formProducto">
-    <input type="text" id="codigo" placeholder="Código / SKU (único)" required>
-    <input type="text" id="nombre" placeholder="Nombre del producto" required>
-    <input type="text" id="categoria" placeholder="Categoría">
-    <input type="number" id="stock" placeholder="Stock inicial" min="0" required>
-    <input type="number" id="precioCosto" placeholder="Precio de costo" step="0.01">
-    <input type="number" id="precioVenta" placeholder="Precio de venta" step="0.01" required>
-    <input type="text" id="proveedor" placeholder="Proveedor">
-    <input type="file" id="foto" accept="image/*">
-    <button type="submit">Añadir Producto</button>
-  </form>
-
-<h2>💰 Registrar Venta</h2>
-<form id="formVenta">
-  <input type="text" id="clienteVenta" placeholder="Cliente (opcional, ej. Mostrador)">
-  <div id="itemsVenta"></div>
-  <button type="button" onclick="agregarItemVenta()">+ Agregar producto</button>
-  <button type="submit">Confirmar Venta</button>
-</form>
-
-<h2>📊 Últimas Ventas</h2>
-<div id="listaVentas"></div>
-
-<script>
-// --- Funciones de venta ---
-let itemsVenta = [];
-function agregarItemVenta() {
-  // Llama correctamente a la ruta de productos
-  fetch('https://appcontabilidad-ljjw.onrender.com/api/productos')  // API_URL ya termina en /api/productos
-    .then(res => {
-      if (!res.ok) throw new Error('Error al cargar productos');
-      return res.json();
-    })
-    .then(productos => {
-      let html = '<select required>';
-      html += '<option value="">Selecciona un producto</option>'; // Opción por defecto
-      productos.forEach(p => {
-        if (p.stock > 0) {
-          html += `<option value="${p._id}">${p.codigo} - ${p.nombre} (Stock: ${p.stock} - $${p.precioVenta})</option>`;
-        }
-      });
-      html += '</select>';
-      html += '<input type="number" min="1" max="999" placeholder="Cantidad" required style="width:120px; margin-left:10px;">';
-      html += '<button type="button" onclick="this.parentNode.remove()" style="margin-left:10px; background:#e74c3c;">Eliminar</button><br><br>';
-
-      const div = document.createElement('div');
-      div.innerHTML = html;
-      document.getElementById('itemsVenta').appendChild(div);
-    })
-    .catch(err => {
-      alert('Error al cargar productos: ' + err.message);
-      console.error(err);
-    });
-}
-document.getElementById('formVenta').addEventListener('submit', async e => {
-  e.preventDefault();
-  itemsVenta = [];
-  const items = document.querySelectorAll('#itemsVenta > div');
-  for (const item of items) {
-    const select = item.querySelector('select');
-    const cantInput = item.querySelector('input[type=number]');
-    if (select && cantInput) {
-      itemsVenta.push({
-        productoId: select.value,
-        cantidad: parseInt(cantInput.value)
-      });
-    }
-  }
-
-  if (itemsVenta.length === 0) return alert('Agregá al menos un producto');
-
-  await fetch(API_URL.replace('/productos', '/ventas'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      productos: itemsVenta,
-      cliente: document.getElementById('clienteVenta').value || 'Mostrador'
-    })
-  });
-
-  alert('Venta registrada - Stock actualizado');
-  document.getElementById('formVenta').reset();
-  document.getElementById('itemsVenta').innerHTML = '';
-  cargarProductos();
-  cargarVentas();
-});
-
-async function cargarVentas() {
-  const res = await fetch(API_URL.replace('/productos', '/ventas'));
-  const ventas = await res.json();
-  const cont = document.getElementById('listaVentas');
-  cont.innerHTML = ventas.length === 0 ? '<p>No hay ventas registradas.</p>' : '';
-  ventas.forEach(v => {
-    const div = document.createElement('div');
-    div.style = 'background:white; padding:15px; margin:10px 0; border-radius:8px;';
-    div.innerHTML = `
-      <strong>Fecha:</strong> ${new Date(v.fecha).toLocaleString('es-AR')}<br>
-      <strong>Cliente:</strong> ${v.cliente}<br>
-      <strong>Total con IVA:</strong> $${v.total.toFixed(2)} (IVA: $${v.iva.toFixed(2)})<br>
-      <ul>${v.productos.map(p => `<li>${p.cantidad}x ${p.nombre} ($${p.precioUnitario}) = $${p.subtotal}</li>`).join('')}</ul>
-    `;
-    cont.appendChild(div);
-  });
-}
-
-cargarVentas(); // Carga al iniciar
-</script>
-
-
-  
-  <div class="buscador">
-    <input type="text" id="busqueda" placeholder="Buscar por código, nombre o categoría...">
-    <button onclick="buscar()">Buscar</button>
-    <button onclick="cargarProductos()">Todos</button>
+  <div id="compras" class="tab">
+    <h2>Registrar Compra</h2>
+    <form id="compraForm">
+      <input type="text" placeholder="Proveedor" id="proveedor">
+      <!-- Asume selección de productos similar a ventas -->
+      <button type="button" onclick="registrarCompra()">Registrar</button>
+    </form>
+    <h2>Lista de Compras</h2>
+    <table id="comprasTable"><tr><th>Fecha</th><th>Total</th><th>Proveedor</th></tr></table>
   </div>
 
-  <div id="listaProductos"></div>
+  <div id="ventas" class="tab active">
+    <!-- Contenido existente para ventas: form y tabla (agrega similar al de compras) -->
+    <h2>Registrar Venta</h2>
+    <form id="ventaForm">
+      <input type="text" placeholder="Cliente" id="cliente">
+      <!-- Productos, etc. -->
+      <button type="button" onclick="registrarVenta()">Registrar</button>
+    </form>
+    <h2>Lista de Ventas</h2>
+    <table id="ventasTable"><tr><th>Fecha</th><th>Total</th><th>Cliente</th></tr></table>
+  </div>
+
+  <div id="pagos" class="tab">
+    <h2>Registrar Pago</h2>
+    <form id="pagoForm">
+      <input type="number" placeholder="Monto" id="montoPago">
+      <input type="text" placeholder="Método" id="metodoPago">
+      <input type="text" placeholder="Ref Compra ID" id="compraRef">
+      <input type="text" placeholder="Proveedor" id="proveedorPago">
+      <button type="button" onclick="registrarPago()">Registrar</button>
+    </form>
+    <h2>Lista de Pagos</h2>
+    <table id="pagosTable"><tr><th>Fecha</th><th>Monto</th><th>Proveedor</th></tr></table>
+  </div>
+
+  <div id="cobros" class="tab">
+    <h2>Registrar Cobro</h2>
+    <form id="cobroForm">
+      <input type="number" placeholder="Monto" id="montoCobro">
+      <input type="text" placeholder="Método" id="metodoCobro">
+      <input type="text" placeholder="Ref Venta ID" id="ventaRef">
+      <input type="text" placeholder="Cliente" id="clienteCobro">
+      <button type="button" onclick="registrarCobro()">Registrar</button>
+    </form>
+    <h2>Lista de Cobros</h2>
+    <table id="cobrosTable"><tr><th>Fecha</th><th>Monto</th><th>Cliente</th></tr></table>
+  </div>
 
   <script>
-    const API_URL = 'https://appcontabilidad-ljjw.onrender.com/api/productos';
-
-    async function cargarProductos() {
-      const res = await fetch(API_URL);
-      const productos = await res.json();
-      mostrarProductos(productos);
+    function showTab(tabId) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
     }
 
-    async function buscar() {
-      const q = document.getElementById('busqueda').value.trim();
-      const url = q ? `${API_URL}/buscar?q=${encodeURIComponent(q)}` : API_URL;
-      const res = await fetch(url);
-      const productos = await res.json();
-      mostrarProductos(productos);
-    }
-
-    function mostrarProductos(productos) {
-      const cont = document.getElementById('listaProductos');
-      cont.innerHTML = productos.length === 0 ? '<p>No hay productos.</p>' : '';
-      productos.forEach(p => {
-        const div = document.createElement('div');
-        div.className = 'producto';
-        div.innerHTML = `
-          ${p.fotoUrl ? `<img src="${p.fotoUrl}" alt="${p.nombre}">` : ''}
-          <div class="info">
-            <h2>${p.nombre} <small>(Código: ${p.codigo})</small></h2>
-            <p><strong>Categoría:</strong> ${p.categoria || 'Sin categoría'}</p>
-            <p class="stock ${p.stock < 10 ? 'bajo' : ''}"><strong>Stock:</strong> ${p.stock} unidades</p>
-            <p><strong>Precio costo:</strong> $${p.precioCosto || 'N/D'} | <strong>Precio venta:</strong> $${p.precioVenta}</p>
-            <p><strong>Proveedor:</strong> ${p.proveedor || 'No especificado'}</p>
-            <div class="acciones">
-              <button onclick="ajustarStock('${p._id}', prompt('Cantidad a sumar/restar (+ o -):'))">Ajustar Stock</button>
-              <button class="eliminar" onclick="eliminar('${p._id}')">Eliminar</button>
-            </div>
-          </div>
-        `;
-        cont.appendChild(div);
+    async function fetchAndDisplay(endpoint, tableId, columns) {
+      const data = await fetch(`http://localhost:5000/api/${endpoint}`).then(res => res.json());
+      const table = document.getElementById(tableId);
+      table.innerHTML = ''; // Limpiar
+      const header = table.insertRow();
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        header.appendChild(th);
+      });
+      data.forEach(item => {
+        const row = table.insertRow();
+        columns.forEach(col => row.insertCell().textContent = item[col.toLowerCase()] || 'N/A');
       });
     }
 
-    document.getElementById('formProducto').addEventListener('submit', async e => {
-      e.preventDefault();
-      const file = document.getElementById('foto').files[0];
-      let base64 = '';
-      if (file) {
-        base64 = await new Promise(res => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result);
-          reader.readAsDataURL(file);
-        });
-      }
-
-      await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          codigo: document.getElementById('codigo').value.trim(),
-          nombre: document.getElementById('nombre').value,
-          categoria: document.getElementById('categoria').value,
-          stock: parseInt(document.getElementById('stock').value),
-          precioCosto: parseFloat(document.getElementById('precioCosto').value) || null,
-          precioVenta: parseFloat(document.getElementById('precioVenta').value),
-          proveedor: document.getElementById('proveedor').value,
-          base64Foto: base64
-        })
-      });
-
-      cargarProductos();
-      e.target.reset();
-    });
-
-    async function ajustarStock(id, cantidadStr) {
-      const cantidad = parseInt(cantidadStr);
-      if (isNaN(cantidad) || cantidad === 0) return alert('Cantidad inválida');
-      await fetch(`${API_URL}/${id}/stock`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cantidad })
-      });
-      cargarProductos();
+    // Funciones de registro (adaptar para productos complejos)
+    async function registrarCompra() {
+      // Lógica para enviar POST a /api/compras (agrega datos del form)
+      alert('Compra registrada');
+      fetchAndDisplay('compras', 'comprasTable', ['Fecha', 'Total', 'Proveedor']);
     }
 
-    async function eliminar(id) {
-      if (confirm('¿Eliminar este producto permanentemente?')) {
-        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-        cargarProductos();
-      }
+    async function registrarVenta() {
+      // Existente, adaptar
+      alert('Venta registrada');
+      fetchAndDisplay('ventas', 'ventasTable', ['Fecha', 'Total', 'Cliente']);
     }
 
-    cargarProductos();
+    async function registrarPago() {
+      const data = {
+        monto: document.getElementById('montoPago').value,
+        metodo: document.getElementById('metodoPago').value,
+        compraRef: document.getElementById('compraRef').value,
+        proveedor: document.getElementById('proveedorPago').value
+      };
+      await fetch('http://localhost:5000/api/pagos', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+      alert('Pago registrado');
+      fetchAndDisplay('pagos', 'pagosTable', ['Fecha', 'Monto', 'Proveedor']);
+    }
+
+    async function registrarCobro() {
+      const data = {
+        monto: document.getElementById('montoCobro').value,
+        metodo: document.getElementById('metodoCobro').value,
+        ventaRef: document.getElementById('ventaRef').value,
+        cliente: document.getElementById('clienteCobro').value
+      };
+      await fetch('http://localhost:5000/api/cobros', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+      alert('Cobro registrado');
+      fetchAndDisplay('cobros', 'cobrosTable', ['Fecha', 'Monto', 'Cliente']);
+    }
+
+    // Cargar listas iniciales
+    fetchAndDisplay('compras', 'comprasTable', ['Fecha', 'Total', 'Proveedor']);
+    fetchAndDisplay('ventas', 'ventasTable', ['Fecha', 'Total', 'Cliente']);
+    fetchAndDisplay('pagos', 'pagosTable', ['Fecha', 'Monto', 'Proveedor']);
+    fetchAndDisplay('cobros', 'cobrosTable', ['Fecha', 'Monto', 'Cliente']);
   </script>
 </body>
 </html>

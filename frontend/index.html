@@ -22,53 +22,85 @@
   <div id="compras" class="tab">
     <h2>Registrar Compra</h2>
     <form id="compraForm">
-      <input type="text" placeholder="Proveedor" id="proveedor">
-      <!-- Asume selección de productos similar a ventas -->
-      <button type="button" onclick="registrarCompra()">Registrar</button>
+      <label>Proveedor:</label>
+      <input type="text" id="proveedor" placeholder="Nombre del proveedor" required>
+
+      <h3>Agregar Productos al Detalle</h3>
+      <select id="productoSelectCompra"></select>
+      <input type="number" id="cantidadCompra" placeholder="Cantidad" min="1" required>
+      <input type="number" id="precioUnitarioCompra" placeholder="Precio Unitario" step="0.01" required>
+      <button type="button" onclick="agregarItem('Compra')">Agregar Item</button>
+
+      <h4>Detalle de la Compra</h4>
+      <table id="detalleCompraTable">
+        <thead><tr><th>Producto</th><th>Cant.</th><th>Precio U.</th><th>Subtotal</th><th>Acción</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <p><strong>Total:</strong> <span id="totalCompra">0.00</span></p>
+      <button type="button" onclick="registrar('Compra')">Registrar Compra Completa</button>
     </form>
+
     <h2>Lista de Compras</h2>
-    <table id="comprasTable"><tr><th>Fecha</th><th>Total</th><th>Proveedor</th></tr></table>
+    <table id="comprasTable"><thead><tr><th>Fecha</th><th>Total</th><th>Proveedor</th></tr></thead><tbody></tbody></table>
   </div>
 
   <div id="ventas" class="tab active">
-    <!-- Contenido existente para ventas: form y tabla (agrega similar al de compras) -->
     <h2>Registrar Venta</h2>
     <form id="ventaForm">
-      <input type="text" placeholder="Cliente" id="cliente">
-      <!-- Productos, etc. -->
-      <button type="button" onclick="registrarVenta()">Registrar</button>
+      <label>Cliente:</label>
+      <input type="text" id="cliente" placeholder="Nombre del cliente" required>
+
+      <h3>Agregar Productos al Detalle</h3>
+      <select id="productoSelectVenta"></select>
+      <input type="number" id="cantidadVenta" placeholder="Cantidad" min="1" required>
+      <input type="number" id="precioUnitarioVenta" placeholder="Precio Unitario" step="0.01" required>
+      <button type="button" onclick="agregarItem('Venta')">Agregar Item</button>
+
+      <h4>Detalle de la Venta</h4>
+      <table id="detalleVentaTable">
+        <thead><tr><th>Producto</th><th>Cant.</th><th>Precio U.</th><th>Subtotal</th><th>Acción</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <p><strong>Total:</strong> <span id="totalVenta">0.00</span></p>
+      <button type="button" onclick="registrar('Venta')">Registrar Venta Completa</button>
     </form>
+
     <h2>Lista de Ventas</h2>
-    <table id="ventasTable"><tr><th>Fecha</th><th>Total</th><th>Cliente</th></tr></table>
+    <table id="ventasTable"><thead><tr><th>Fecha</th><th>Total</th><th>Cliente</th></tr></thead><tbody></tbody></table>
   </div>
 
   <div id="pagos" class="tab">
     <h2>Registrar Pago</h2>
     <form id="pagoForm">
-      <input type="number" placeholder="Monto" id="montoPago">
-      <input type="text" placeholder="Método" id="metodoPago">
-      <input type="text" placeholder="Ref Compra ID" id="compraRef">
-      <input type="text" placeholder="Proveedor" id="proveedorPago">
+      <input type="number" placeholder="Monto" id="montoPago" required>
+      <input type="text" placeholder="Método (ej: efectivo)" id="metodoPago" required>
+      <input type="text" placeholder="Ref Compra ID" id="compraRef" required>
+      <input type="text" placeholder="Proveedor" id="proveedorPago" required>
       <button type="button" onclick="registrarPago()">Registrar</button>
     </form>
     <h2>Lista de Pagos</h2>
-    <table id="pagosTable"><tr><th>Fecha</th><th>Monto</th><th>Proveedor</th></tr></table>
+    <table id="pagosTable"><thead><tr><th>Fecha</th><th>Monto</th><th>Proveedor</th></tr></thead><tbody></tbody></table>
   </div>
 
   <div id="cobros" class="tab">
     <h2>Registrar Cobro</h2>
     <form id="cobroForm">
-      <input type="number" placeholder="Monto" id="montoCobro">
-      <input type="text" placeholder="Método" id="metodoCobro">
-      <input type="text" placeholder="Ref Venta ID" id="ventaRef">
-      <input type="text" placeholder="Cliente" id="clienteCobro">
+      <input type="number" placeholder="Monto" id="montoCobro" required>
+      <input type="text" placeholder="Método (ej: transferencia)" id="metodoCobro" required>
+      <input type="text" placeholder="Ref Venta ID" id="ventaRef" required>
+      <input type="text" placeholder="Cliente" id="clienteCobro" required>
       <button type="button" onclick="registrarCobro()">Registrar</button>
     </form>
     <h2>Lista de Cobros</h2>
-    <table id="cobrosTable"><tr><th>Fecha</th><th>Monto</th><th>Cliente</th></tr></table>
+    <table id="cobrosTable"><thead><tr><th>Fecha</th><th>Monto</th><th>Cliente</th></tr></thead><tbody></tbody></table>
   </div>
 
   <script>
+    let itemsCompra = [];
+    let itemsVenta = [];
+
     function showTab(tabId) {
       document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
@@ -77,35 +109,128 @@
     async function fetchAndDisplay(endpoint, tableId, columns) {
       const data = await fetch(`http://localhost:5000/api/${endpoint}`).then(res => res.json());
       const table = document.getElementById(tableId);
-      table.innerHTML = ''; // Limpiar
-      const header = table.insertRow();
-      columns.forEach(col => {
-        const th = document.createElement('th');
-        th.textContent = col;
-        header.appendChild(th);
-      });
+      const tbody = table.querySelector('tbody');
+      tbody.innerHTML = '';
       data.forEach(item => {
-        const row = table.insertRow();
-        columns.forEach(col => row.insertCell().textContent = item[col.toLowerCase()] || 'N/A');
+        const row = tbody.insertRow();
+        columns.forEach(col => {
+          const cell = row.insertCell();
+          cell.textContent = item[col.toLowerCase()] || 'N/A';
+        });
       });
     }
 
-    // Funciones de registro (adaptar para productos complejos)
-    async function registrarCompra() {
-      // Lógica para enviar POST a /api/compras (agrega datos del form)
-      alert('Compra registrada');
-      fetchAndDisplay('compras', 'comprasTable', ['Fecha', 'Total', 'Proveedor']);
+    async function cargarProductosSelect(tipo) {
+      const res = await fetch('http://localhost:5000/api/productos');
+      const productos = await res.json();
+      const select = document.getElementById(`productoSelect${tipo}`);
+      select.innerHTML = '';
+      productos.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ id: p._id, codigo: p.codigo, nombre: p.nombre, precio: tipo === 'Compra' ? (p.precioCosto || 0) : (p.precioVenta || 0) });
+        opt.textContent = `${p.nombre} (${p.codigo}) - Stock: ${p.stock}`;
+        select.appendChild(opt);
+      });
     }
 
-    async function registrarVenta() {
-      // Existente, adaptar
-      alert('Venta registrada');
+    document.addEventListener('DOMContentLoaded', () => {
+      cargarProductosSelect('Compra');
+      cargarProductosSelect('Venta');
+      fetchAndDisplay('compras', 'comprasTable', ['Fecha', 'Total', 'Proveedor']);
       fetchAndDisplay('ventas', 'ventasTable', ['Fecha', 'Total', 'Cliente']);
+      fetchAndDisplay('pagos', 'pagosTable', ['Fecha', 'Monto', 'Proveedor']);
+      fetchAndDisplay('cobros', 'cobrosTable', ['Fecha', 'Monto', 'Cliente']);
+    });
+
+    function agregarItem(tipo) {
+      const select = document.getElementById(`productoSelect${tipo}`);
+      const selected = JSON.parse(select.value || '{}');
+      const cantidad = parseInt(document.getElementById(`cantidad${tipo}`).value);
+      const precio = parseFloat(document.getElementById(`precioUnitario${tipo}`).value);
+
+      if (!selected.id || cantidad < 1 || precio <= 0) return alert('Completa los datos');
+
+      const subtotal = cantidad * precio;
+      const item = { productoId: selected.id, codigo: selected.codigo, nombre: selected.nombre, cantidad, precioUnitario: precio, subtotal };
+
+      if (tipo === 'Compra') itemsCompra.push(item);
+      else itemsVenta.push(item);
+
+      actualizarTablaDetalle(tipo);
+      actualizarTotal(tipo);
+
+      document.getElementById(`cantidad${tipo}`).value = '';
+      document.getElementById(`precioUnitario${tipo}`).value = '';
+    }
+
+    function actualizarTablaDetalle(tipo) {
+      const items = tipo === 'Compra' ? itemsCompra : itemsVenta;
+      const tbody = document.querySelector(`#detalle${tipo}Table tbody`);
+      tbody.innerHTML = '';
+      items.forEach((item, index) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${item.nombre} (${item.codigo})</td>
+          <td>${item.cantidad}</td>
+          <td>${item.precioUnitario.toFixed(2)}</td>
+          <td>${item.subtotal.toFixed(2)}</td>
+          <td><button onclick="eliminarItem('${tipo}', ${index})">Eliminar</button></td>
+        `;
+      });
+    }
+
+    function eliminarItem(tipo, index) {
+      if (tipo === 'Compra') itemsCompra.splice(index, 1);
+      else itemsVenta.splice(index, 1);
+      actualizarTablaDetalle(tipo);
+      actualizarTotal(tipo);
+    }
+
+    function actualizarTotal(tipo) {
+      const items = tipo === 'Compra' ? itemsCompra : itemsVenta;
+      const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+      document.getElementById(`total${tipo}`).textContent = total.toFixed(2);
+    }
+
+    async function registrar(tipo) {
+      const items = tipo === 'Compra' ? itemsCompra : itemsVenta;
+      if (items.length === 0) return alert('Agrega al menos un producto');
+
+      const nombreCampo = tipo === 'Compra' ? 'proveedor' : 'cliente';
+      const valorCampo = document.getElementById(nombreCampo).value.trim();
+      if (!valorCampo) return alert(`Ingresa el ${nombreCampo}`);
+
+      const data = {
+        productos: items,
+        [nombreCampo]: valorCampo
+      };
+
+      const endpoint = tipo.toLowerCase() + 's';
+
+      try {
+        const res = await fetch(`http://localhost:5000/api/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          alert(`${tipo} registrada con detalle`);
+          if (tipo === 'Compra') itemsCompra = [];
+          else itemsVenta = [];
+          actualizarTablaDetalle(tipo);
+          actualizarTotal(tipo);
+          fetchAndDisplay(endpoint, `${endpoint}Table`, ['Fecha', 'Total', tipo === 'Compra' ? 'Proveedor' : 'Cliente']);
+        } else {
+          alert('Error al registrar');
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
 
     async function registrarPago() {
       const data = {
-        monto: document.getElementById('montoPago').value,
+        monto: parseFloat(document.getElementById('montoPago').value),
         metodo: document.getElementById('metodoPago').value,
         compraRef: document.getElementById('compraRef').value,
         proveedor: document.getElementById('proveedorPago').value
@@ -117,7 +242,7 @@
 
     async function registrarCobro() {
       const data = {
-        monto: document.getElementById('montoCobro').value,
+        monto: parseFloat(document.getElementById('montoCobro').value),
         metodo: document.getElementById('metodoCobro').value,
         ventaRef: document.getElementById('ventaRef').value,
         cliente: document.getElementById('clienteCobro').value
@@ -126,12 +251,6 @@
       alert('Cobro registrado');
       fetchAndDisplay('cobros', 'cobrosTable', ['Fecha', 'Monto', 'Cliente']);
     }
-
-    // Cargar listas iniciales
-    fetchAndDisplay('compras', 'comprasTable', ['Fecha', 'Total', 'Proveedor']);
-    fetchAndDisplay('ventas', 'ventasTable', ['Fecha', 'Total', 'Cliente']);
-    fetchAndDisplay('pagos', 'pagosTable', ['Fecha', 'Monto', 'Proveedor']);
-    fetchAndDisplay('cobros', 'cobrosTable', ['Fecha', 'Monto', 'Cliente']);
   </script>
 </body>
 </html>

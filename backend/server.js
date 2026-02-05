@@ -19,7 +19,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Conectado a MongoDB Atlas'))
   .catch(err => console.error('Error MongoDB:', err));
 
-// Modelo de Producto (existente)
+// Modelo de Producto
 const productoSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true },
   nombre: { type: String, required: true },
@@ -34,51 +34,51 @@ const productoSchema = new mongoose.Schema({
 });
 const Producto = mongoose.model('Producto', productoSchema);
 
-// Modelo de Venta (existente)
+// Modelo de Venta
 const ventaSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   productos: [{
-    productoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto' },
-    codigo: String,
-    nombre: String,
-    cantidad: Number,
-    precioUnitario: Number,
-    subtotal: Number
+    productoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto', required: true },
+    codigo: { type: String, required: true },
+    nombre: { type: String, required: true },
+    cantidad: { type: Number, required: true, min: 1 },
+    precioUnitario: { type: Number, required: true },
+    subtotal: { type: Number, required: true }
   }],
-  total: Number,
+  total: { type: Number, required: true },
   iva: Number,
   cliente: String,
 });
 const Venta = mongoose.model('Venta', ventaSchema);
 
-// Nuevo Modelo de Compra
+// Modelo de Compra
 const compraSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   productos: [{
-    productoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto' },
-    codigo: String,
-    nombre: String,
-    cantidad: Number,
-    precioUnitario: Number,
-    subtotal: Number
+    productoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Producto', required: true },
+    codigo: { type: String, required: true },
+    nombre: { type: String, required: true },
+    cantidad: { type: Number, required: true, min: 1 },
+    precioUnitario: { type: Number, required: true },
+    subtotal: { type: Number, required: true }
   }],
-  total: Number,
+  total: { type: Number, required: true },
   iva: Number,
   proveedor: String,
 });
 const Compra = mongoose.model('Compra', compraSchema);
 
-// Nuevo Modelo de Pago (asociado a compras)
+// Modelo de Pago
 const pagoSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   monto: Number,
-  metodo: String, // e.g., 'efectivo', 'transferencia'
+  metodo: String,
   compraRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Compra' },
   proveedor: String,
 });
 const Pago = mongoose.model('Pago', pagoSchema);
 
-// Nuevo Modelo de Cobro (asociado a ventas)
+// Modelo de Cobro
 const cobroSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
   monto: Number,
@@ -88,9 +88,13 @@ const cobroSchema = new mongoose.Schema({
 });
 const Cobro = mongoose.model('Cobro', cobroSchema);
 
-// Rutas existentes para productos y ventas (mantenidas, omitidas por brevedad)...
+// Rutas para Productos (asumiendo existentes; agrega si no)
+app.get('/api/productos', async (req, res) => {
+  const productos = await Producto.find();
+  res.json(productos);
+});
 
-// Nuevas rutas para Compras
+// Rutas para Compras
 app.post('/api/compras', async (req, res) => {
   try {
     const { productos, proveedor } = req.body;
@@ -104,7 +108,7 @@ app.post('/api/compras', async (req, res) => {
       const subtotal = item.precioUnitario * item.cantidad;
       total += subtotal;
 
-      producto.stock += item.cantidad; // Añade stock
+      producto.stock += item.cantidad;
       await producto.save();
 
       productosComprados.push({
@@ -139,7 +143,57 @@ app.get('/api/compras', async (req, res) => {
   res.json(compras);
 });
 
-// Rutas para Pagos
+// Rutas para Ventas (similar a compras, con resta de stock)
+app.post('/api/ventas', async (req, res) => {
+  try {
+    const { productos, cliente } = req.body;
+    let total = 0;
+    const productosVendidos = [];
+
+    for (const item of productos) {
+      const producto = await Producto.findById(item.productoId);
+      if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
+      if (producto.stock < item.cantidad) return res.status(400).json({ error: 'Stock insuficiente' });
+
+      const subtotal = item.precioUnitario * item.cantidad;
+      total += subtotal;
+
+      producto.stock -= item.cantidad;
+      await producto.save();
+
+      productosVendidos.push({
+        productoId: producto._id,
+        codigo: producto.codigo,
+        nombre: producto.nombre,
+        cantidad: item.cantidad,
+        precioUnitario: item.precioUnitario,
+        subtotal
+      });
+    }
+
+    const iva = total * 0.21;
+    const totalConIva = total + iva;
+
+    const nuevaVenta = new Venta({
+      productos: productosVendidos,
+      total: totalConIva,
+      iva,
+      cliente: cliente || 'Desconocido'
+    });
+
+    await nuevaVenta.save();
+    res.json(nuevaVenta);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/ventas', async (req, res) => {
+  const ventas = await Venta.find().sort({ fecha: -1 }).limit(100);
+  res.json(ventas);
+});
+
+// Rutas para Pagos y Cobros (mantenidas simples)
 app.post('/api/pagos', async (req, res) => {
   try {
     const nuevoPago = new Pago(req.body);
@@ -155,7 +209,6 @@ app.get('/api/pagos', async (req, res) => {
   res.json(pagos);
 });
 
-// Rutas para Cobros
 app.post('/api/cobros', async (req, res) => {
   try {
     const nuevoCobro = new Cobro(req.body);
@@ -171,4 +224,4 @@ app.get('/api/cobros', async (req, res) => {
   res.json(cobros);
 });
 
-app.listen(PORT, () => console.log(`Backend contabilidad en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`Backend en puerto ${PORT}`));
